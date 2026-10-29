@@ -1,0 +1,10 @@
+# Datos personales: nunca se publican (el repositorio es público)
+originales/
+tools/fixtures/
+tools/out/
+web/dev-real*.json
+.DS_Store
+node_modules/
+.clasprc.json
+.clasp.json
+CLAUDE.local.md
