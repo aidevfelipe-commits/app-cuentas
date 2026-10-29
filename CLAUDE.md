@@ -43,7 +43,7 @@ Los movimientos los sube un proyecto local del dueño (no está en este repo). C
   reglas por primera palabra (sigue aplicando las Reglas al subir). Origen sigue siendo solo
   `Auto`/`Manual`/`Sin clasificar`; si había un apunte en Origen, al clasificar pasa a `Nota`.
 - IDs (completar al configurar): script `…`, deployment API `…` (fijo, nunca crear otro), proyecto GCP
-  `…`, cliente OAuth `…`, cuenta GitHub/repo `…`, URL `https://…github.io/app-cuentas/`.
+  `…`, cliente OAuth `…` (detalle en `CLAUDE.local.md`), URL `https://aidevfelipe-commits.github.io/app-cuentas/`.
 
 ## Publicar
 ```bash
