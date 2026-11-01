@@ -9,15 +9,12 @@ hace con **la cuenta de Google dueña de la planilla "Control de Gastos"**. Anot
    nuevo: ponerle de nombre **Cuentas**. Luego ⚙ **Configuración del proyecto** ▸ copiar el
    **ID de secuencia de comandos** (script ID) y pasárselo a Claude.
 2. 👤 Activar la API de Apps Script: https://script.google.com/home/usersettings ▸ Activada.
-3. 👤 En la terminal, si clasp tiene abierta otra cuenta:
+3. 👤 Dar acceso a clasp con la cuenta dueña de la planilla, con nombre propio para no pisar otras
+   cuentas ya conectadas:
    ```bash
-   clasp logout
+   clasp login --user cuentas
    ```
-   ```bash
-   clasp login
-   ```
-   y entrar con la cuenta dueña de la planilla.
-4. Claude crea `.clasp.json` con el script ID y sube el código: `clasp push -f`.
+4. Claude crea `.clasp.json` con el script ID y sube el código: `clasp --user cuentas push -f`.
 5. 👤 Recargar la planilla ▸ menú **Cuentas ▸ Preparar planilla**. Google pide autorizar
    ("Configuración avanzada ▸ Ir a Cuentas (no seguro)" es normal en scripts propios). Hace, en orden:
    respaldo en Drive, pestañas `App_*`, 4 columnas nuevas **al final** de `Movimientos` (no mueve
@@ -28,11 +25,11 @@ hace con **la cuenta de Google dueña de la planilla "Control de Gastos"**. Anot
 
 ## 2. Inicio de sesión con Google
 
-1. 👤 https://console.cloud.google.com ▸ Crear proyecto "Cuentas".
-2. 👤 Google Auth Platform ▸ **Branding**: nombre "Cuentas", tu correo de asistencia, página
-   principal = la URL de GitHub Pages (paso 4), privacidad = `<URL>/privacidad.html`, dominio
-   autorizado `github.io`. ▸ **Audiencia**: Externo y **Publicar app** (con solo correo/perfil no
-   pide verificación; si queda "en prueba", la otra persona ve "Acceso bloqueado").
+1. 👤 https://console.cloud.google.com ▸ un proyecto (se usó el mismo de la Service Account).
+2. 👤 Google Auth Platform ▸ **Comenzar**: nombre "Cuentas", correo de asistencia, público **Externo**.
+   Se deja en modo **Prueba** a propósito y se agregan las dos cuentas en **Audiencia ▸ Usuarios de
+   prueba**: así solo ellas pueden iniciar sesión, y no hace falta página principal ni de privacidad
+   (que Google exige para publicarla). Quien no esté en la lista ve "Acceso bloqueado".
 3. 👤 **Clientes ▸ Crear cliente ▸ Aplicación web**. Orígenes autorizados:
    `https://<usuario-github>.github.io` y `http://localhost:8766`. Copiar el ID (termina en
    `.apps.googleusercontent.com`) en la planilla, `App_Ajustes ▸ googleClientId`, y pasárselo a Claude
@@ -41,18 +38,20 @@ hace con **la cuenta de Google dueña de la planilla "Control de Gastos"**. Anot
 ## 3. Publicar la API
 
 ```bash
-cd apps-script && clasp push -f && clasp deploy -d "API"
+clasp --user cuentas push -f && clasp --user cuentas deploy -d "API"
 ```
-Anotar el ID del deployment (`AKfy…`): es para siempre (`clasp update-deployment <ID>`; nunca otro
-`clasp deploy`). La URL `https://script.google.com/macros/s/<ID>/exec` va en `web/config.js ▸ apiUrl`.
+Anotar el ID del deployment (`AKfy…`): es para siempre (`clasp --user cuentas update-deployment <ID>`;
+nunca otro `clasp deploy`). La URL `https://script.google.com/macros/s/<ID>/exec` va en `web/config.js ▸ apiUrl`.
 Comprobar `<URL>?accion=ping` → `{"ok":true,…}`.
 
 ## 4. GitHub Pages
 
 1. 👤 Decidir con qué cuenta de GitHub publicar (ver `CLAUDE.local.md`). Crear ahí un repositorio
    **público** `app-cuentas`.
-2. `git remote add origin … && git push -u origin main`.
-3. 👤 Repo ▸ Settings ▸ Pages ▸ Source: **GitHub Actions**.
+2. 👤 `gh repo create <cuenta>/app-cuentas --public --source . --remote origin --push` (crear algo
+   público lo aprueba el dueño). Si GitHub rechaza `.github/workflows/`, falta el permiso:
+   `gh auth refresh -h github.com -s workflow`.
+3. Activar Pages con Actions: `gh api -X POST repos/<cuenta>/app-cuentas/pages -f build_type=workflow`.
 4. Si la URL final cambió, actualizar los orígenes del cliente OAuth (paso 2.3) y la página principal.
 
 ## 5. Primera prueba real
