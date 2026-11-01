@@ -4,7 +4,7 @@
  * POST (cuerpo JSON enviado como text/plain para evitar CORS):
  *   { accion: 'entrar', credential }                          -> { token, usuario }
  *   { accion: 'datos', token }                                -> movimientos ya clasificados
- *   { accion: 'clasificar', token, ids, categoria, nota?, recordar? }
+ *   { accion: 'clasificar', token, ids, categoria, nota?, recordar?, mes? }   (mes: 'AAAA-MM' del presupuesto)
  *   { accion: 'confirmar', token, ids }                       (revisé las automáticas)
  *   { accion: 'nota', token, ids: [id], nota }
  *   { accion: 'regla', token, palabra, categoria }           (solo admin: regla fija en Reglas)

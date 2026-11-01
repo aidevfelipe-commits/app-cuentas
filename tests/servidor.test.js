@@ -135,7 +135,7 @@ function post(e, cuerpo) { return JSON.parse(e.ctx.doPost({ postData: { contents
 test('Preparar planilla: respalda, crea pestañas App_, agrega columnas al final y clasifica', () => {
   const e = preparado();
   assert.equal(e.copias.length, 1, 'un respaldo antes de tocar nada');
-  assert.deepEqual(e.hojas.Movimientos.datos[0], TITULOS_MOV.concat(['Sugerencia', 'Confianza', 'Clasificado_Por', 'Fecha_Clasif']));
+  assert.deepEqual(e.hojas.Movimientos.datos[0], TITULOS_MOV.concat(['Sugerencia', 'Confianza', 'Clasificado_Por', 'Fecha_Clasif', 'Mes_Presupuesto']));
   assert.deepEqual(e.hojas.Presupuesto.datos, [['Mi pestaña', 'no tocar'], ['x', 1]]);
   const ajustes = Object.fromEntries(tabla(e, 'App_Ajustes').map(f => [f.Clave, f.Valor]));
   assert.equal(ajustes.clasificaLaApp, 'Sí');
@@ -257,6 +257,41 @@ test('la persona editora también clasifica y queda registrado su nombre', () =>
   const d = post(e, { accion: 'clasificar', token: r.token, ids: ['mv_1'], categoria: 'Comida' });
   assert.equal(d.planilla, '', 'el enlace a la planilla es solo para admin');
   assert.equal(mov(e, 'mv_1').Clasificado_Por, 'Persona Dos');
+});
+
+test('mes del presupuesto: se guarda al clasificar, vuelve al mes de la fecha y no admite meses lejanos', () => {
+  const e = conSesion();
+  const token = sesion(e);
+  // Planilla anterior a esta función: sin la columna (se agrega al final la primera vez)
+  const t = e.hojas.Movimientos.datos[0];
+  t.splice(t.indexOf('Mes_Presupuesto'), 1);
+  const propio = e.ctx.Utilities.formatDate(hoy(1), '', 'yyyy-MM');
+  const d0 = new Date(hoy(1)); d0.setDate(1); d0.setMonth(d0.getMonth() + 1);
+  const siguiente = e.ctx.Utilities.formatDate(d0, '', 'yyyy-MM');
+
+  let d = post(e, { accion: 'clasificar', token, ids: ['mv_1'], categoria: 'Comida', mes: siguiente });
+  assert.equal(d.ok, true, d.error);
+  assert.equal(e.hojas.Movimientos.datos[0].at(-1), 'Mes_Presupuesto', 'columna nueva al final');
+  assert.equal(d.movimientos.find(m => m.id === 'mv_1').mesPresupuesto, siguiente);
+  assert.equal(d.movimientos.find(m => m.id === 'mv_2').mesPresupuesto, '', 'los demás siguen en el mes de su fecha');
+
+  d = post(e, { accion: 'clasificar', token, ids: ['mv_1'], categoria: 'Comida', mes: propio });
+  assert.equal(d.movimientos.find(m => m.id === 'mv_1').mesPresupuesto, '', 'el mes de la fecha se guarda vacío');
+  assert.equal(mov(e, 'mv_1').Mes_Presupuesto, '');
+
+  d = post(e, { accion: 'clasificar', token, ids: ['mv_1'], categoria: 'Comida' });
+  assert.equal(d.movimientos.find(m => m.id === 'mv_1').mesPresupuesto, '', 'sin mes no se toca');
+  assert.match(post(e, { accion: 'clasificar', token, ids: ['mv_1'], categoria: 'Comida', mes: '2020-01' }).error, /cerca de la fecha/);
+  assert.match(post(e, { accion: 'clasificar', token, ids: ['mv_1'], categoria: 'Comida', mes: 'noviembre' }).error, /inválido/);
+});
+
+test('mes del presupuesto: se lee aunque Sheets lo haya convertido en fecha', () => {
+  const e = conSesion();
+  const [t] = e.hojas.Movimientos.datos;
+  const fila = e.hojas.Movimientos.datos.find(f => f[0] === 'mv_9');
+  fila[t.indexOf('Mes_Presupuesto')] = new (require('vm').runInContext('Date', e.ctx))(2026, 10, 1);
+  const d = post(e, { accion: 'datos', token: sesion(e) });
+  assert.equal(d.movimientos.find(m => m.id === 'mv_9').mesPresupuesto, '2026-11');
 });
 
 test('respaldo deja solo las copias configuradas', () => {

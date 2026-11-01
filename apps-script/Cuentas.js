@@ -29,7 +29,8 @@ function leerMovimientos_() {
       confianza: confianzaDeCelda_(f['Confianza']),
       porQuien: String(f['Clasificado_Por'] || ''),
       fechaClasif: fechaISO_(fechaHora_(f['Fecha_Clasif']) || ''),
-      clasificadoEn: fechaHora_(f['Fecha_Clasif']) ? fechaHora_(f['Fecha_Clasif']).toISOString() : ''
+      clasificadoEn: fechaHora_(f['Fecha_Clasif']) ? fechaHora_(f['Fecha_Clasif']).toISOString() : '',
+      mesPresupuesto: mesDeCelda_(f['Mes_Presupuesto'])
     };
   });
 }
@@ -51,9 +52,11 @@ function aplicarCambios_(movs, cambios) {
   actualizarFilas_('movimientos', cambios.map(function (c) {
     var campos = Object.assign({}, c.campos);
     if (typeof campos['Confianza'] === 'number') campos['Confianza'] = Math.round(campos['Confianza'] * 100) + '%';
+    // Con apóstrofo para que Sheets no convierta 'AAAA-MM' en fecha
+    if (campos['Mes_Presupuesto']) campos['Mes_Presupuesto'] = "'" + campos['Mes_Presupuesto'];
     return { fila: c.fila, campos: campos };
   }));
-  var CAMPO = { 'Categoria': 'categoria', 'Origen': 'origen', 'Nota': 'nota', 'Sugerencia': 'sugerencia', 'Confianza': 'confianza', 'Clasificado_Por': 'porQuien' };
+  var CAMPO = { 'Categoria': 'categoria', 'Origen': 'origen', 'Nota': 'nota', 'Sugerencia': 'sugerencia', 'Confianza': 'confianza', 'Clasificado_Por': 'porQuien', 'Mes_Presupuesto': 'mesPresupuesto' };
   cambios.forEach(function (c) {
     var m = porFila[c.fila];
     if (!m) return;
@@ -82,7 +85,10 @@ function datosUsuario_(yo, cfg, pasada) {
   var inicio = fechaISO_(cfg.inicioControl);
   if (inicio && inicio > desde) desde = inicio;
   var movimientos = pasada.movs
-    .filter(function (m) { return m.id && (m.fecha >= desde || (esPendiente(m) && (!inicio || m.fecha >= inicio))); })
+    .filter(function (m) {
+      return m.id && (m.fecha >= desde || (m.mesPresupuesto && m.mesPresupuesto >= desde.slice(0, 7)) ||
+        (esPendiente(m) && (!inicio || m.fecha >= inicio)));
+    })
     .map(function (m) {
       var r = pasada.plan.resultados[m.fila];
       var pendiente = esPendiente(m) || !m.categoria || m.categoria === SIN_CLASIFICAR;
@@ -91,6 +97,7 @@ function datosUsuario_(yo, cfg, pasada) {
         categoria: pendiente ? SIN_CLASIFICAR : m.categoria,
         origen: pendiente ? SIN_CLASIFICAR : (m.origen === 'Auto' ? 'Auto' : 'Manual'),
         nota: m.nota, porQuien: m.porQuien, fechaClasif: m.fechaClasif, clasificadoEn: m.clasificadoEn,
+        mesPresupuesto: m.mesPresupuesto,
         huella: huella(m.glosa), transferencia: esTransferencia(m.glosa),
         sugerencia: pendiente && r ? r.categoria : '',
         confianza: pendiente && r ? r.confianza : '',
@@ -128,8 +135,10 @@ function ubicar_(movs, ids) {
 }
 
 /**
- * Clasifica a mano: { ids, categoria, nota?, recordar? }. categoria = "Sin clasificar" deshace.
+ * Clasifica a mano: { ids, categoria, nota?, recordar?, mes? }. categoria = "Sin clasificar" deshace.
  * recordar (transferencias): crea una regla Recordada para que ese destinatario se clasifique solo.
+ * mes ('AAAA-MM'): el mes del presupuesto en que cuenta (ej. el súper del 30 que es del mes siguiente).
+ * Si es el mes de la fecha, o '', se borra y vuelve a contar en el mes de la fecha.
  */
 function clasificar_(yo, cfg, p) {
   var categoria = String(p.categoria || '').trim();
@@ -147,6 +156,10 @@ function clasificar_(yo, cfg, p) {
     };
   });
   if (p.nota !== undefined && elegidos.length === 1) cambios[0].campos['Nota'] = String(p.nota).slice(0, 500);
+  if (p.mes !== undefined) {
+    asegurarColumnas_('movimientos'); // la columna Mes_Presupuesto se agrega al final la primera vez
+    elegidos.forEach(function (m, i) { cambios[i].campos['Mes_Presupuesto'] = mesPresupuesto_(m, p.mes); });
+  }
   // Origen solo admite Auto/Manual/Sin clasificar: si alguien escribió ahí un apunte, se pasa a Nota en vez de perderlo
   elegidos.forEach(function (m, i) {
     if (['', 'Auto', 'Manual', SIN_CLASIFICAR].indexOf(m.origen) >= 0) return;
@@ -156,6 +169,17 @@ function clasificar_(yo, cfg, p) {
   aplicarCambios_(movs, cambios);
   if (p.recordar && !deshacer) recordarDestinatario_(elegidos[0], categoria, yo);
   return datosUsuario_(yo, cfg, pasadaClasificador_(cfg));
+}
+
+/** Valida el mes elegido: 'AAAA-MM' a lo más 2 meses de la fecha. '' si es el mes de la fecha. */
+function mesPresupuesto_(mov, mes) {
+  mes = String(mes || '').trim();
+  if (!mes) return '';
+  if (!/^\d{4}-\d{2}$/.test(mes)) throw new Error('Mes inválido: ' + mes);
+  var propio = mov.fecha.slice(0, 7);
+  var distancia = function (a) { return +a.slice(0, 4) * 12 + +a.slice(5, 7); };
+  if (Math.abs(distancia(mes) - distancia(propio)) > 2) throw new Error('El mes del presupuesto debe estar cerca de la fecha del movimiento.');
+  return mes === propio ? '' : mes;
 }
 
 function recordarDestinatario_(mov, categoria, yo) {

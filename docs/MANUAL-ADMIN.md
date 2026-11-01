@@ -7,6 +7,12 @@
   vienen juntos ("Guardar 3 en …" o "por separado"). Debajo está **Lo último que clasificaron**: toca
   uno para corregirlo. Al final, plegados, los que se **clasificaron solos**: ábrelos, revísalos y
   marca "Están bien" (eso también enseña). Si te equivocas, el aviso de abajo tiene **Deshacer**.
+- **Mes del presupuesto**: cada gasto cuenta en el mes de su fecha. Si uno es de otro mes (el súper
+  del 30 que es del presupuesto siguiente), elige **"Cuenta para el presupuesto de: Noviembre"** antes
+  de Guardar. En la bandeja aparece en los primeros y últimos días del mes; en cualquier movimiento,
+  al tocarlo. Lo movido se ve en los dos meses (atenuado en el que no cuenta, con "↪ cuenta en …") y
+  la pantalla Mes dice cuánto entró o salió. Queda en la columna `Mes_Presupuesto` (vacía = mes de
+  la fecha).
 - **Movimientos**: el mes, con filtros por categoría, cuenta y texto. Toca un movimiento para
   cambiar su categoría (elige y toca Guardar) o escribir una nota.
 - **Más**: cómo va el aprendizaje, enlace a la planilla (solo admin) y salir.

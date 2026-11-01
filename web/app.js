@@ -3,7 +3,7 @@
 
   var CLAVE_SESION = 'cuentas-sesion-v1';
   var CLAVE_DATOS = 'cuentas-datos-v1';
-  var VERSION_APP = 'v8'; // igual que VERSION en sw.js (subir ambas en cada cambio)
+  var VERSION_APP = 'v9'; // igual que VERSION en sw.js (subir ambas en cada cambio)
   var NOMBRE = 'Cuentas';
   var SIN = 'Sin clasificar';
   var MAX_AUTOS = 30;
@@ -15,7 +15,7 @@
     datos: null, token: null, sinConexion: false, error: '',
     enCurso: 0, ultimo: null, huboError: false,
     separados: {}, abierto: null, mes: '', filtroCat: '', filtroCuenta: '', busqueda: '', verAutos: false, verTodasAutos: false,
-    elegidas: {} // categoría marcada (aún sin guardar) por grupo de ids
+    elegidas: {}, mesesElegidos: {} // categoría y mes marcados (aún sin guardar) por grupo de ids
   };
   var cola = Promise.resolve();
   var app = document.getElementById('app');
@@ -141,29 +141,54 @@
     });
   }
 
+  /** extra: { nota?, recordar?, mes? } (mes: 'AAAA-MM' del presupuesto en que cuenta). */
   function clasificar(ids, categoria, extra) {
-    var antes = ids.map(function (id) { var m = porId(id); return { id: id, categoria: m.categoria, origen: m.origen }; });
+    extra = extra || {};
+    var conMes = extra.mes !== undefined;
+    var antes = ids.map(function (id) { var m = porId(id); return { id: id, categoria: m.categoria, origen: m.origen, mes: mesPres(m) }; });
     var yo = estado.datos.usuario.nombre;
-    enviar('clasificar', Object.assign({ ids: ids, categoria: categoria }, extra || {}), function () {
+    enviar('clasificar', Object.assign({ ids: ids, categoria: categoria }, extra), function () {
       ids.forEach(function (id) {
         var m = porId(id);
         m.categoria = categoria;
         m.origen = categoria === SIN ? SIN : 'Manual';
         m.porQuien = categoria === SIN ? '' : yo;
         m.clasificadoEn = categoria === SIN ? '' : new Date().toISOString();
-        if (extra && extra.nota !== undefined) m.nota = extra.nota;
+        if (extra.nota !== undefined) m.nota = extra.nota;
+        if (conMes) ponerMes(m, extra.mes);
       });
     });
     if (categoria === SIN) return;
-    aviso(plural(ids.length, 'movimiento', 'movimientos') + ' en ' + categoria + '.', false, function () {
-      // Deshacer: los que estaban pendientes vuelven a la bandeja; los demás, a su categoría anterior
-      var pend = antes.filter(function (a) { return a.origen === SIN; }).map(function (a) { return a.id; });
-      if (pend.length) clasificar(pend, SIN);
-      antes.filter(function (a) { return a.origen !== SIN; }).forEach(function (a) {
-        enviar('clasificar', { ids: [a.id], categoria: a.categoria }, function () { var m = porId(a.id); m.categoria = a.categoria; m.origen = 'Manual'; });
+    var soloMes = conMes && antes.every(function (a) { return a.origen !== SIN && a.categoria === categoria; });
+    var texto = soloMes ? plural(ids.length, 'movimiento ahora cuenta', 'movimientos ahora cuentan') + ' en ' + mesSolo(extra.mes)
+      : plural(ids.length, 'movimiento', 'movimientos') + ' en ' + categoria + (conMes && extra.mes !== mesDe(porId(ids[0]).fecha) ? ', cuenta en ' + mesSolo(extra.mes) : '');
+    aviso(texto + '.', false, function () {
+      // Deshacer: los que estaban pendientes vuelven a la bandeja; los demás, a su categoría (y mes) anterior
+      var grupos = {};
+      antes.forEach(function (a) {
+        var cat = a.origen === SIN ? SIN : a.categoria, k = cat + '|' + (conMes ? a.mes : '');
+        (grupos[k] = grupos[k] || { cat: cat, mes: a.mes, ids: [] }).ids.push(a.id);
+      });
+      Object.keys(grupos).forEach(function (k) {
+        var g = grupos[k], datos = { ids: g.ids, categoria: g.cat };
+        if (conMes) datos.mes = g.mes;
+        enviar('clasificar', datos, function () {
+          g.ids.forEach(function (id) {
+            var m = porId(id);
+            m.categoria = g.cat;
+            m.origen = g.cat === SIN ? SIN : 'Manual';
+            if (g.cat === SIN) { m.porQuien = ''; m.clasificadoEn = ''; }
+            if (conMes) ponerMes(m, g.mes);
+          });
+        });
       });
     });
   }
+
+  /** Mes del presupuesto en que cuenta un movimiento: el elegido a mano o el de su fecha. */
+  function mesPres(m) { return m.mesPresupuesto || mesDe(m.fecha); }
+  function ponerMes(m, ym) { m.mesPresupuesto = ym === mesDe(m.fecha) ? '' : ym; }
+  function mesSolo(ym) { return MESES[+ym.slice(5, 7) - 1]; }
 
   function salir(mensaje) {
     estado.token = null;
@@ -271,7 +296,8 @@
    * Categorías para elegir + botón Guardar. Tocar una categoría solo la marca (así un toque
    * equivocado no clasifica); se guarda con el botón. La sugerencia viene marcada de antemano.
    */
-  function chips(ids, actual, sugerida) {
+  function chips(movs, actual, sugerida, siempreMes) {
+    var ids = movs.map(function (m) { return m.id; });
     var c = estado.datos.categorias, clave = ids.join(',');
     var elegida = estado.elegidas[clave] !== undefined ? estado.elegidas[clave] : (sugerida || actual || '');
     function chip(cat, clase) {
@@ -283,12 +309,48 @@
       var i = categorias().indexOf(sugerida);
       lista.unshift(lista.splice(i, 1)[0]);
     }
-    return '<div class="chips" role="group" aria-label="Categoría" data-actual="' + esc(actual) + '">' + lista.join('') + '</div>' + botonGuardar(ids.length, elegida, actual);
+    var mes = cuentaPara(movs, clave, siempreMes);
+    return '<div class="chips" role="group" aria-label="Categoría" data-actual="' + esc(actual) + '">' + lista.join('') + '</div>' +
+      (mes ? mes.html : '') + botonGuardar(ids.length, elegida, actual, mes);
   }
 
-  function botonGuardar(n, elegida, actual) {
-    var texto = !elegida ? 'Elige una categoría' : elegida === actual ? 'Ya está en ' + elegida : 'Guardar' + (n > 1 ? ' ' + n : '') + ' en ' + elegida;
-    return '<button type="button" class="boton guardar" data-accion="guardar" data-cat="' + esc(elegida) + '"' + (elegida && elegida !== actual ? '' : ' disabled') + '>' + esc(texto) + '</button>';
+  /**
+   * "Cuenta para el presupuesto de: octubre | noviembre". Se muestra en los últimos y primeros días
+   * del mes (o si ya se movió); en el editor, siempre. Solo si todos los movimientos son del mismo mes.
+   */
+  function cuentaPara(movs, clave, siempre) {
+    var m = movs[0], propio = mesDe(m.fecha), actual = mesPres(m);
+    if (!propio || movs.some(function (x) { return mesDe(x.fecha) !== propio || mesPres(x) !== actual; })) return null;
+    var dia = +m.fecha.slice(8, 10);
+    if (!siempre && actual === propio && dia > 5 && dia < 25) return null;
+    var vecino = actual !== propio ? actual : mesMas(propio, dia >= 16 ? 1 : -1);
+    var elegido = estado.mesesElegidos[clave] || actual;
+    var opciones = [propio, vecino].sort();
+    var html = '<div class="cuenta-para" data-actual="' + esc(actual) + '" data-propio="' + esc(propio) + '"><span class="sub">Cuenta para el presupuesto de</span>' +
+      '<div class="segmentos" role="group" aria-label="Mes del presupuesto">' + opciones.map(function (ym) {
+        var nombre = mesSolo(ym);
+        return '<button type="button" data-accion="elegir-mes" data-mes="' + ym + '" aria-pressed="' + (ym === elegido) + '">' + esc(nombre.charAt(0).toUpperCase() + nombre.slice(1)) + '</button>';
+      }).join('') + '</div></div>';
+    return { html: html, elegido: elegido, actual: actual, propio: propio };
+  }
+
+  function botonGuardar(n, elegida, actual, mes) {
+    var cambiaCat = elegida && elegida !== actual, cambiaMes = mes && mes.elegido !== mes.actual;
+    var otroMes = mes && mes.elegido !== mes.propio ? ', cuenta en ' + mesSolo(mes.elegido) : '';
+    var texto = !elegida ? 'Elige una categoría'
+      : cambiaCat ? 'Guardar' + (n > 1 ? ' ' + n : '') + ' en ' + elegida + otroMes
+        : cambiaMes ? 'Guardar: cuenta en ' + mesSolo(mes.elegido)
+          : 'Ya está en ' + elegida + otroMes;
+    return '<button type="button" class="boton guardar" data-accion="guardar" data-cat="' + esc(elegida) + '"' +
+      (cambiaMes ? ' data-mes="' + esc(mes.elegido) + '"' : '') + (cambiaCat || (elegida && cambiaMes) ? '' : ' disabled') + '>' + esc(texto) + '</button>';
+  }
+
+  /** Repinta solo el botón Guardar según lo marcado en la tarjeta (sin repintar la pantalla). */
+  function refrescarGuardar(caja) {
+    var sel = caja.querySelector('.chip.elegida'), cp = caja.querySelector('.cuenta-para');
+    var mes = cp && { elegido: cp.querySelector('[aria-pressed=true]').getAttribute('data-mes'), actual: cp.getAttribute('data-actual'), propio: cp.getAttribute('data-propio') };
+    caja.querySelector('[data-accion=guardar]').outerHTML = botonGuardar(caja.getAttribute('data-ids').split(',').length,
+      sel ? sel.getAttribute('data-cat') : '', caja.querySelector('.chips').getAttribute('data-actual'), mes);
   }
 
   /* ----- Bandeja: lo que falta clasificar y lo clasificado solo ----- */
@@ -332,7 +394,7 @@
     }
     if (m.nota) h += '<p class="nota-mov">' + esc(m.nota) + '</p>';
     if (m.sugerencia) h += '<p class="sugerencia">Sugerencia: <b>' + esc(m.sugerencia) + '</b> · ' + esc(m.motivo) + '</p>';
-    h += chips(ids, '', m.sugerencia);
+    h += chips(g, '', m.sugerencia);
     if (m.transferencia) h += '<label class="recordar"><input type="checkbox" name="recordar"> Recordar este destinatario (la próxima vez se clasifica solo)</label>';
     if (g.length === 1) h += '<details class="agregar-nota"><summary>Agregar nota</summary><input type="text" name="nota" maxlength="500" placeholder="Ej.: regalo de cumpleaños" value="' + esc(m.nota) + '"></details>';
     return h + '</article>';
@@ -364,13 +426,17 @@
     return h + '</ul>';
   }
 
-  /** Una fila de lista; al tocarla se abre el editor (categoría, nota, recordar). */
-  function filaMovimiento(m, conMotivo, conQuien) {
+  /**
+   * Una fila de lista; al tocarla se abre el editor (categoría, mes, nota, recordar).
+   * atenuada: es de este mes pero cuenta en el presupuesto de otro.
+   */
+  function filaMovimiento(m, conMotivo, conQuien, atenuada) {
     var abierto = estado.abierto === m.id;
     var sub = [cuentaCorta(m.cuenta), fechaCorta(m.fecha)];
+    if (mesPres(m) !== mesDe(m.fecha)) sub.push('↪ cuenta en ' + mesSolo(mesPres(m)));
     if (conMotivo && m.motivo) sub.push(m.motivo);
     if (conQuien && m.porQuien) sub.push(primerNombre(m.porQuien));
-    var h = '<li class="' + (abierto ? 'abierto' : '') + '"><button type="button" class="fila" data-accion="abrir" data-id="' + esc(m.id) + '" aria-expanded="' + abierto + '">' +
+    var h = '<li class="' + (abierto ? 'abierto' : '') + (atenuada ? ' otro-mes' : '') + '"><button type="button" class="fila" data-accion="abrir" data-id="' + esc(m.id) + '" aria-expanded="' + abierto + '">' +
       '<span class="fila-texto"><span class="glosa">' + esc(m.glosa) + '</span><span class="sub">' + esc(sub.join(' · ')) + '</span></span>' +
       '<span class="fila-der"><span class="monto ' + claseMonto(m) + '">' + esc(dinero(m.monto, m.moneda)) + '</span>' +
       '<span class="cat" style="--cat:' + colorCat(m.categoria) + '">' + esc(m.categoria) + (m.origen === 'Auto' ? ' · auto' : '') + '</span></span></button>';
@@ -383,7 +449,7 @@
       : m.origen === 'Auto' ? 'Clasificado solo · ' + m.motivo
         : 'Clasificado por ' + (m.porQuien || '¿?') + (m.fechaClasif ? ' el ' + fechaCorta(m.fechaClasif) : '');
     return '<div class="editor" data-ids="' + esc(m.id) + '"><p class="sub">' + esc(info) + '</p>' +
-      chips([m.id], m.origen === SIN ? '' : m.categoria, m.origen === SIN ? m.sugerencia : '') +
+      chips([m], m.origen === SIN ? '' : m.categoria, m.origen === SIN ? m.sugerencia : '', true) +
       (m.transferencia ? '<label class="recordar"><input type="checkbox" name="recordar"> Recordar este destinatario</label>' : '') +
       '<div class="nota-fila"><input type="text" name="nota" maxlength="500" placeholder="Nota" value="' + esc(m.nota) + '">' +
       '<button type="button" class="boton secundario chico" data-accion="nota" data-id="' + esc(m.id) + '">Guardar nota</button></div></div>';
@@ -392,6 +458,8 @@
   /* ----- Movimientos del mes, con filtros ----- */
   function selectorMes() {
     var mes = estado.mes, primero = mesDe(estado.datos.desde), ultimo = mesDe(new Date().toISOString());
+    // Se puede ir hasta un mes futuro si hay gastos movidos a él (ej. el súper del 30 que cuenta en el siguiente)
+    movimientos().forEach(function (m) { if (mesPres(m) > ultimo) ultimo = mesPres(m); });
     return '<div class="selector-mes"><button type="button" data-accion="mes" data-delta="-1" aria-label="Mes anterior"' + (mes <= primero ? ' disabled' : '') + '>‹</button>' +
       '<h2>' + esc(nombreMes(mes)) + '</h2>' +
       '<button type="button" data-accion="mes" data-delta="1" aria-label="Mes siguiente"' + (mes >= ultimo ? ' disabled' : '') + '>›</button></div>';
@@ -403,11 +471,19 @@
    * Cuentas del mes, igual que la hoja Resumen: Presupuesto (fila del mes o Default), Gastado
    * (pesos de la categoría, neto de devoluciones, + US$ x tipo de cambio si lo hay), Pendiente
    * (compromisos de la hoja Pendientes) y Remanente. Pago tarjeta y Abono no son gasto.
+   * Cada movimiento cuenta en su mes del presupuesto (el de su fecha, salvo que lo hayan movido).
    */
   function resumenMes(ym) {
     var d = estado.datos, pres = d.presupuesto || { porDefecto: {}, meses: {} }, pend = (d.pendientes || {})[ym] || {};
-    var tc = d.tipoCambio || 0, delMes = movimientos().filter(function (m) { return mesDe(m.fecha) === ym; });
-    var r = { categorias: [], presupuesto: 0, gastado: 0, pendiente: 0, usdSinConvertir: 0, ingresos: 0, sinClasificar: 0, nSinClasificar: 0 };
+    var tc = d.tipoCambio || 0, delMes = movimientos().filter(function (m) { return mesPres(m) === ym; });
+    var r = { categorias: [], presupuesto: 0, gastado: 0, pendiente: 0, usdSinConvertir: 0, ingresos: 0, sinClasificar: 0, nSinClasificar: 0,
+      entran: { n: 0, monto: 0 }, salen: { n: 0, monto: 0 } };
+    movimientos().forEach(function (m) {
+      var mov = mesPres(m) === ym && mesDe(m.fecha) !== ym ? r.entran : mesDe(m.fecha) === ym && mesPres(m) !== ym ? r.salen : null;
+      if (!mov) return;
+      mov.n++;
+      if (m.moneda !== 'USD') mov.monto -= m.monto;
+    });
     d.categorias.presupuesto.forEach(function (cat) {
       var delMesCat = (pres.meses[ym] || {})[cat];
       var c = { nombre: cat, presupuesto: delMesCat !== undefined ? delMesCat : (pres.porDefecto[cat] || 0), gastado: 0, usd: 0, pendiente: pend[cat] || 0 };
@@ -493,6 +569,8 @@
       (r.presupuesto ? '<p class="' + (r.remanente < 0 ? 'alerta' : 'queda') + '">' + (r.remanente < 0 ? 'Te pasaste ' + esc(dinero(-r.remanente)) : 'Te quedan ' + esc(dinero(r.remanente))) + '</p>' : '') +
       (esActual ? '<p class="sub">Vamos en el día ' + hoy.getDate() + ' de ' + diasMes + ' (' + Math.round(avance * 100) + ' % del mes). La rayita de la barra es hoy.</p>' : '') +
       (r.pendiente ? '<p class="sub">Incluye ' + esc(dinero(r.pendiente)) + ' comprometidos que aún no se cobran.</p>' : '') +
+      (r.entran.n ? '<p class="sub">↪ Incluye ' + plural(r.entran.n, 'movimiento de otro mes que cuenta', 'movimientos de otro mes que cuentan') + ' en este (' + esc(dinero(r.entran.monto)) + ').</p>' : '') +
+      (r.salen.n ? '<p class="sub">↪ ' + plural(r.salen.n, 'movimiento de este mes cuenta', 'movimientos de este mes cuentan') + ' en otro (' + esc(dinero(r.salen.monto)) + ').</p>' : '') +
       '</section>';
 
     if (r.nSinClasificar) h += '<a class="tarjeta aviso-pendiente" href="#bandeja"><b>' + plural(r.nSinClasificar, 'movimiento', 'movimientos') + ' sin clasificar</b> (' + esc(dinero(r.sinClasificar)) + ') no se cuentan todavía. Clasificar ›</a>';
@@ -539,8 +617,10 @@
   /** Solo la lista y los totales: se repinta al escribir en la búsqueda sin perder el foco. */
   function pintarLista() {
     var b = norm(estado.busqueda), cats = estado.datos.categorias.presupuesto;
-    var delMes = movimientos().filter(function (m) { return mesDe(m.fecha) === estado.mes; });
-    var lista = delMes.filter(function (m) {
+    // Se ven los del mes y los que cuentan en él; los totales, solo lo que cuenta en el mes
+    var delMes = movimientos().filter(function (m) { return mesPres(m) === estado.mes; });
+    var vistos = movimientos().filter(function (m) { return mesPres(m) === estado.mes || mesDe(m.fecha) === estado.mes; });
+    var lista = vistos.filter(function (m) {
       return (!estado.filtroCat || m.categoria === estado.filtroCat) &&
         (!estado.filtroCuenta || m.cuenta === estado.filtroCuenta) &&
         (!b || norm(m.glosa + ' ' + m.nota).indexOf(b) >= 0);
@@ -559,7 +639,7 @@
     document.getElementById('totales').innerHTML = t;
 
     var h = '';
-    if (!lista.length) h = '<p class="nota">' + (delMes.length ? 'Nada calza con el filtro.' : 'No hay movimientos este mes.') + '</p>';
+    if (!lista.length) h = '<p class="nota">' + (vistos.length ? 'Nada calza con el filtro.' : 'No hay movimientos este mes.') + '</p>';
     var dia = null;
     lista.forEach(function (m) {
       if (m.fecha !== dia) {
@@ -567,11 +647,11 @@
         dia = m.fecha;
         h += '<h3 class="dia">' + esc(fechaDia(m.fecha)) + '</h3><ul class="lista">';
       }
-      h += filaMovimiento(m, m.origen === 'Auto');
+      h += filaMovimiento(m, m.origen === 'Auto', false, mesPres(m) !== estado.mes);
     });
     if (dia !== null) h += '</ul>';
     if (lista.length && (estado.filtroCat || estado.filtroCuenta || b)) {
-      var suma = lista.reduce(function (s, m) { return s + (m.moneda === 'USD' ? 0 : m.monto); }, 0);
+      var suma = lista.reduce(function (s, m) { return s + (m.moneda === 'USD' || mesPres(m) !== estado.mes ? 0 : m.monto); }, 0);
       h += '<p class="nota">' + plural(lista.length, 'movimiento', 'movimientos') + ' · suma ' + esc(dinero(suma)) + '</p>';
     }
     document.getElementById('lista').innerHTML = h;
@@ -621,7 +701,12 @@
         x.classList.toggle('elegida', si);
         x.setAttribute('aria-pressed', si);
       });
-      cajaE.querySelector('[data-accion=guardar]').outerHTML = botonGuardar(claveE.split(',').length, cat, grupo.getAttribute('data-actual'));
+      refrescarGuardar(cajaE);
+    } else if (accion === 'elegir-mes') {
+      var cajaM = b.closest('.mov, .editor');
+      estado.mesesElegidos[cajaM.getAttribute('data-ids')] = b.getAttribute('data-mes');
+      b.parentNode.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+      refrescarGuardar(cajaM);
     } else if (accion === 'guardar') {
       // closest() incluye al propio botón: la caja es la tarjeta o el editor que lo contiene
       var caja = b.closest('.mov, .editor');
@@ -629,7 +714,9 @@
       if (rec && rec.checked) extra.recordar = true;
       var clave = caja.getAttribute('data-ids'), ids = clave.split(',');
       if (nota && ids.length === 1 && nota.value.trim() !== (porId(ids[0]).nota || '')) extra.nota = nota.value.trim();
+      if (b.hasAttribute('data-mes')) extra.mes = b.getAttribute('data-mes');
       delete estado.elegidas[clave];
+      delete estado.mesesElegidos[clave];
       estado.abierto = null;
       clasificar(ids, b.getAttribute('data-cat'), extra);
     } else if (accion === 'abrir-autos') {

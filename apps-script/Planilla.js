@@ -30,7 +30,7 @@ var HOJAS = {
     nombre: 'Movimientos',
     existente: true,
     obligatorios: ['ID', 'Fecha', 'Glosa', 'Monto', 'Cuenta', 'Categoria', 'Origen'],
-    titulos: ['Sugerencia', 'Confianza', 'Clasificado_Por', 'Fecha_Clasif']
+    titulos: ['Sugerencia', 'Confianza', 'Clasificado_Por', 'Fecha_Clasif', 'Mes_Presupuesto']
   },
   reglas: {
     nombre: 'Reglas',
@@ -218,4 +218,11 @@ function fechaISO_(v) {
   if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   var m = /(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(v || ''));
   return m ? m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2) : '';
+}
+
+/** Mes 'AAAA-MM' de una celda (Sheets puede haber convertido el texto en fecha), o '' si no hay. */
+function mesDeCelda_(v) {
+  if (v instanceof Date) return isNaN(v) ? '' : Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM');
+  var m = /^'?(\d{4})-(\d{1,2})/.exec(String(v || '').trim());
+  return m ? m[1] + '-' + ('0' + m[2]).slice(-2) : '';
 }

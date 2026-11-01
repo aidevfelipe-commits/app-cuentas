@@ -200,3 +200,12 @@ a { color: var(--primario); }
 .fila-saldo.libre span { color: var(--tinta); font-weight: 600; }
 .fila-saldo.libre b { font-size: 1.6rem; color: var(--abono); }
 .fila-saldo.libre.negativo b { color: var(--gasto); }
+
+/* ---------- Mes del presupuesto ---------- */
+.cuenta-para { display: grid; gap: 6px; }
+.segmentos { display: flex; border: 1px solid var(--linea); border-radius: 12px; overflow: hidden; }
+.segmentos button { appearance: none; flex: 1; border: 0; background: var(--fondo); color: var(--tinta); font: 600 .95rem var(--sans); padding: 10px 8px; min-height: 42px; cursor: pointer; }
+.segmentos button + button { border-left: 1px solid var(--linea); }
+.segmentos button[aria-pressed="true"] { background: var(--primario); color: var(--sobre-primario); }
+@media (prefers-color-scheme: dark) { .segmentos button[aria-pressed="true"] { background: var(--c0); color: #10181c; } }
+.lista li.otro-mes { opacity: .6; }

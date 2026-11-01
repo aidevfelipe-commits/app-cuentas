@@ -47,7 +47,9 @@ este repo es público).
     (HOJAS, tablas por título, `fechaHora_`), `Menu.js` (Preparar planilla, tareas, respaldo diario).
 - Pestañas de la app: `App_Ajustes` (incluye `inicioControl`, `tipoCambio`, `clasificaLaApp`),
   `App_Personas`, `App_Registro`. Columnas de la app en `Movimientos`: `Sugerencia`, `Confianza`,
-  `Clasificado_Por`, `Fecha_Clasif`. Pestañas que llena el proceso local: `Movimientos`, `Reglas`, `Saldos`.
+  `Clasificado_Por`, `Fecha_Clasif`, `Mes_Presupuesto` (esta última se agrega sola la primera vez que
+  alguien mueve un gasto de mes; se escribe con apóstrofo para que Sheets no la convierta en fecha y se
+  lee con `mesDeCelda_`). Pestañas que llena el proceso local: `Movimientos`, `Reglas`, `Saldos`.
 - IDs y cuentas: en `CLAUDE.local.md`. URL: `https://aidevfelipe-commits.github.io/app-cuentas/`.
 
 ## Publicar
@@ -59,13 +61,18 @@ git add -A && git commit -m "…" && git push      # publica la web (GitHub Acti
 Tras `update-deployment`, la API tarda ~15 s en servir el código nuevo.
 
 ## Estado actual (2026-11-01)
-- **En producción y en uso por las dos personas** (app instalada en los teléfonos). Web v8, API
-  versión 13 (mismo deployment de siempre). 35 pruebas en Node.
+- **En producción y en uso por las dos personas** (app instalada en los teléfonos). Web v9, API
+  versión 14 (mismo deployment de siempre). 37 pruebas en Node.
 - v8 (2026-11-01): clasificar en dos pasos (tocar la categoría solo la marca, se guarda con el botón
   "Guardar en …"; la sugerencia viene marcada) porque con un toque había muchos errores. "Lo último que
   clasificaron" va antes que las automáticas, que quedan plegadas (había 61 y tapaban la sección).
   Arreglado: la nota y "Recordar destinatario" de la bandeja no se enviaban (`closest('[data-ids]')`
   devolvía el propio botón).
+- v9 (2026-11-01): **mes del presupuesto**. Cada movimiento cuenta en el mes de su fecha salvo que
+  lo muevan ("Cuenta para el presupuesto de: Octubre | Noviembre" al clasificar; a la vista en la
+  bandeja los días 1–5 y 25–31 o si ya se movió; en el editor, siempre; máx. ±2 meses). Mes,
+  Movimientos y sus totales usan `mesPres(m)`; lo movido se ve en ambos meses (atenuado donde no
+  cuenta) y la pantalla Mes dice cuánto entró y salió. Acción `clasificar` con `mes` opcional.
 - Hecho: bandeja con agrupación por comercio, revisión de automáticas, "Lo último que
   clasificaron" para corregir, movimientos con filtros y notas, deshacer, pantalla Mes con presupuesto
   y saldos del banco, reglas fijas desde la app, `inicioControl = 2026-10-01` (septiembre no se pide
@@ -85,9 +92,7 @@ Tras `update-deployment`, la API tarda ~15 s en servir el código nuevo.
 
 ## Pendientes
 Camino acordado el 2026-11-01 para "dejar todo cuadrado" (disponible, deuda y presupuesto por ítem):
-(a) ✅ guardar con botón y "Lo último" visible (v8); (b) **Mes del presupuesto**: columna nueva al final
-de `Movimientos` (vacía = mes de la fecha), selector "Cuenta para: oct · nov" al clasificar (a la vista
-en los últimos/primeros días del mes), lo movido se ve en ambos meses; nunca automático; (c) el dueño
+(a) ✅ guardar con botón y "Lo último" visible (v8); (b) ✅ mes del presupuesto (v9); (c) el dueño
 cierra octubre en la app; (d) corrida del 2-nov (abajo); (e) dólares: 63 compras US$ de la tarjeta en
 octubre (60 en No Presup.), `tipoCambio = 0`: decidir conversión, revisar duplicados y sumar la deuda
 US$ al "disponible de verdad"; (f) presupuesto de noviembre + compromisos fijos → arriba de Mes:
