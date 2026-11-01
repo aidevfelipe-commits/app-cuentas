@@ -2,12 +2,13 @@
 
 ## Qué hace la app
 
-- **Bandeja**: lo que falta clasificar. Toca la categoría; la que tiene ✓ es la sugerencia. Los
-  movimientos del mismo comercio vienen juntos (se clasifican de un toque o "por separado"). Abajo
-  están los que se **clasificaron solos**: revísalos y marca "Están bien" (eso también enseña).
-  Si te equivocas, el aviso de abajo tiene **Deshacer**.
+- **Bandeja**: lo que falta clasificar. Elige la categoría y toca **Guardar** (tocar una categoría
+  solo la marca; la que tiene ✓ es la sugerencia y viene marcada). Los movimientos del mismo comercio
+  vienen juntos ("Guardar 3 en …" o "por separado"). Debajo está **Lo último que clasificaron**: toca
+  uno para corregirlo. Al final, plegados, los que se **clasificaron solos**: ábrelos, revísalos y
+  marca "Están bien" (eso también enseña). Si te equivocas, el aviso de abajo tiene **Deshacer**.
 - **Movimientos**: el mes, con filtros por categoría, cuenta y texto. Toca un movimiento para
-  cambiar su categoría o escribir una nota.
+  cambiar su categoría (elige y toca Guardar) o escribir una nota.
 - **Más**: cómo va el aprendizaje, enlace a la planilla (solo admin) y salir.
 
 ## Cómo aprende

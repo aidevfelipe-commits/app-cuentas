@@ -3,7 +3,7 @@
 
   var CLAVE_SESION = 'cuentas-sesion-v1';
   var CLAVE_DATOS = 'cuentas-datos-v1';
-  var VERSION_APP = 'v7'; // igual que VERSION en sw.js (subir ambas en cada cambio)
+  var VERSION_APP = 'v8'; // igual que VERSION en sw.js (subir ambas en cada cambio)
   var NOMBRE = 'Cuentas';
   var SIN = 'Sin clasificar';
   var MAX_AUTOS = 30;
@@ -14,7 +14,8 @@
   var estado = {
     datos: null, token: null, sinConexion: false, error: '',
     enCurso: 0, ultimo: null, huboError: false,
-    separados: {}, abierto: null, mes: '', filtroCat: '', filtroCuenta: '', busqueda: '', verTodasAutos: false
+    separados: {}, abierto: null, mes: '', filtroCat: '', filtroCuenta: '', busqueda: '', verAutos: false, verTodasAutos: false,
+    elegidas: {} // categoría marcada (aún sin guardar) por grupo de ids
   };
   var cola = Promise.resolve();
   var app = document.getElementById('app');
@@ -266,10 +267,15 @@
     return '<nav class="navegacion">' + item('mes', 'Mes') + item('bandeja', 'Bandeja', n) + item('movimientos', 'Movimientos') + item('mas', 'Más') + '</nav>';
   }
 
+  /**
+   * Categorías para elegir + botón Guardar. Tocar una categoría solo la marca (así un toque
+   * equivocado no clasifica); se guarda con el botón. La sugerencia viene marcada de antemano.
+   */
   function chips(ids, actual, sugerida) {
-    var c = estado.datos.categorias, idsTxt = esc(ids.join(','));
+    var c = estado.datos.categorias, clave = ids.join(',');
+    var elegida = estado.elegidas[clave] !== undefined ? estado.elegidas[clave] : (sugerida || actual || '');
     function chip(cat, clase) {
-      return '<button type="button" class="chip ' + clase + (cat === actual ? ' actual' : '') + (cat === sugerida ? ' sugerida' : '') + '" style="--cat:' + colorCat(cat) + '" data-accion="clasificar" data-ids="' + idsTxt + '" data-cat="' + esc(cat) + '">' +
+      return '<button type="button" class="chip ' + clase + (cat === actual ? ' actual' : '') + (cat === sugerida ? ' sugerida' : '') + (cat === elegida ? ' elegida' : '') + '" style="--cat:' + colorCat(cat) + '" data-accion="elegir" data-cat="' + esc(cat) + '" aria-pressed="' + (cat === elegida) + '">' +
         (cat === sugerida ? '✓ ' : '') + esc(cat) + '</button>';
     }
     var lista = c.presupuesto.map(function (x) { return chip(x, ''); }).concat(c.especiales.map(function (x) { return chip(x, 'especial'); }));
@@ -277,7 +283,12 @@
       var i = categorias().indexOf(sugerida);
       lista.unshift(lista.splice(i, 1)[0]);
     }
-    return '<div class="chips">' + lista.join('') + '</div>';
+    return '<div class="chips" role="group" aria-label="Categoría" data-actual="' + esc(actual) + '">' + lista.join('') + '</div>' + botonGuardar(ids.length, elegida, actual);
+  }
+
+  function botonGuardar(n, elegida, actual) {
+    var texto = !elegida ? 'Elige una categoría' : elegida === actual ? 'Ya está en ' + elegida : 'Guardar' + (n > 1 ? ' ' + n : '') + ' en ' + elegida;
+    return '<button type="button" class="boton guardar" data-accion="guardar" data-cat="' + esc(elegida) + '"' + (elegida && elegida !== actual ? '' : ' disabled') + '>' + esc(texto) + '</button>';
   }
 
   /* ----- Bandeja: lo que falta clasificar y lo clasificado solo ----- */
@@ -297,11 +308,12 @@
     if (!pend.length) {
       h += '<section class="al-dia"><span aria-hidden="true">✓</span><h2>Todo clasificado</h2><p>Cuando lleguen movimientos nuevos del banco aparecerán aquí.</p></section>';
     } else {
-      h += '<p class="resumen"><b>' + plural(pend.length, 'movimiento', 'movimientos') + '</b> por clasificar. Toca la categoría; lo marcado con ✓ es la sugerencia.</p>';
+      h += '<p class="resumen"><b>' + plural(pend.length, 'movimiento', 'movimientos') + '</b> por clasificar. Elige la categoría y toca <b>Guardar</b>; la marcada con ✓ es la sugerencia.</p>';
       grupos.forEach(function (g) { h += tarjetaPendiente(g); });
     }
-    if (autos.length) h += seccionAutos(autos);
+    // Lo último clasificado va antes que las automáticas (que pueden ser muchas) para que se vea
     h += seccionRecientes();
+    if (autos.length) h += seccionAutos(autos);
     if (estado.sinConexion) h += '<p class="nota">Sin conexión: se muestra lo último guardado.</p>';
     return h + '</main>';
   }
@@ -326,9 +338,13 @@
     return h + '</article>';
   }
 
+  /** Plegada por defecto: se abre con su título. */
   function seccionAutos(autos) {
+    var h = '<h2 class="titulo-seccion"><button type="button" class="plegable" data-accion="abrir-autos" aria-expanded="' + estado.verAutos + '">' +
+      'Clasificados solos · ' + autos.length + ' por revisar <span aria-hidden="true">' + (estado.verAutos ? '▾' : '▸') + '</span></button></h2>';
+    if (!estado.verAutos) return h;
     var mostrar = estado.verTodasAutos ? autos : autos.slice(0, MAX_AUTOS);
-    var h = '<h2 class="titulo-seccion">Clasificados solos · revísalos</h2><ul class="lista autos">';
+    h += '<ul class="lista autos">';
     mostrar.forEach(function (m) { h += filaMovimiento(m, true); });
     h += '</ul>';
     if (autos.length > mostrar.length) h += '<button type="button" class="enlace centrado" data-accion="ver-autos">Ver los ' + autos.length + '</button>';
@@ -343,7 +359,7 @@
       .sort(function (a, b) { return cuando(a) < cuando(b) ? 1 : cuando(a) > cuando(b) ? -1 : 0; })
       .slice(0, MAX_RECIENTES);
     if (!recientes.length) return '';
-    var h = '<h2 class="titulo-seccion">Lo último que clasificaron · toca para corregir</h2><ul class="lista">';
+    var h = '<h2 class="titulo-seccion">Lo último que clasificaron · toca uno para corregirlo</h2><ul class="lista">';
     recientes.forEach(function (m) { h += filaMovimiento(m, false, true); });
     return h + '</ul>';
   }
@@ -595,14 +611,30 @@
     var b = e.target.closest('[data-accion]');
     if (!b) return;
     var accion = b.getAttribute('data-accion');
-    if (accion === 'clasificar') {
-      var caja = b.closest('[data-ids]');
-      var extra = {}, rec = caja && caja.querySelector('input[name=recordar]'), nota = caja && caja.querySelector('input[name=nota]');
+    if (accion === 'elegir') {
+      // Solo marca la categoría (sin repintar, para no perder la nota a medio escribir)
+      var cajaE = b.closest('.mov, .editor'), cat = b.getAttribute('data-cat'), grupo = b.parentNode;
+      var claveE = cajaE.getAttribute('data-ids');
+      estado.elegidas[claveE] = cat;
+      grupo.querySelectorAll('.chip').forEach(function (x) {
+        var si = x === b;
+        x.classList.toggle('elegida', si);
+        x.setAttribute('aria-pressed', si);
+      });
+      cajaE.querySelector('[data-accion=guardar]').outerHTML = botonGuardar(claveE.split(',').length, cat, grupo.getAttribute('data-actual'));
+    } else if (accion === 'guardar') {
+      // closest() incluye al propio botón: la caja es la tarjeta o el editor que lo contiene
+      var caja = b.closest('.mov, .editor');
+      var extra = {}, rec = caja.querySelector('input[name=recordar]'), nota = caja.querySelector('input[name=nota]');
       if (rec && rec.checked) extra.recordar = true;
-      var ids = b.getAttribute('data-ids').split(',');
-      if (nota && ids.length === 1 && nota.value !== (porId(ids[0]).nota || '')) extra.nota = nota.value.trim();
+      var clave = caja.getAttribute('data-ids'), ids = clave.split(',');
+      if (nota && ids.length === 1 && nota.value.trim() !== (porId(ids[0]).nota || '')) extra.nota = nota.value.trim();
+      delete estado.elegidas[clave];
       estado.abierto = null;
       clasificar(ids, b.getAttribute('data-cat'), extra);
+    } else if (accion === 'abrir-autos') {
+      estado.verAutos = !estado.verAutos;
+      render();
     } else if (accion === 'confirmar') {
       var lista = b.getAttribute('data-ids').split(',').filter(Boolean);
       var yo = estado.datos.usuario.nombre;

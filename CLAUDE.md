@@ -59,9 +59,14 @@ git add -A && git commit -m "…" && git push      # publica la web (GitHub Acti
 Tras `update-deployment`, la API tarda ~15 s en servir el código nuevo.
 
 ## Estado actual (2026-11-01)
-- **En producción y en uso por las dos personas** (app instalada en los teléfonos). Web v7, API
+- **En producción y en uso por las dos personas** (app instalada en los teléfonos). Web v8, API
   versión 13 (mismo deployment de siempre). 35 pruebas en Node.
-- Hecho: bandeja con un toque y agrupación por comercio, revisión de automáticas, "Lo último que
+- v8 (2026-11-01): clasificar en dos pasos (tocar la categoría solo la marca, se guarda con el botón
+  "Guardar en …"; la sugerencia viene marcada) porque con un toque había muchos errores. "Lo último que
+  clasificaron" va antes que las automáticas, que quedan plegadas (había 61 y tapaban la sección).
+  Arreglado: la nota y "Recordar destinatario" de la bandeja no se enviaban (`closest('[data-ids]')`
+  devolvía el propio botón).
+- Hecho: bandeja con agrupación por comercio, revisión de automáticas, "Lo último que
   clasificaron" para corregir, movimientos con filtros y notas, deshacer, pantalla Mes con presupuesto
   y saldos del banco, reglas fijas desde la app, `inicioControl = 2026-10-01` (septiembre no se pide
   clasificar), respaldo diario, reglas `pago de tarjeta` y `monto cancelado` → Pago tarjeta.
@@ -79,6 +84,15 @@ Tras `update-deployment`, la API tarda ~15 s en servir el código nuevo.
 - El token de `gh` necesita el permiso `workflow` para subir `.github/workflows/`.
 
 ## Pendientes
+Camino acordado el 2026-11-01 para "dejar todo cuadrado" (disponible, deuda y presupuesto por ítem):
+(a) ✅ guardar con botón y "Lo último" visible (v8); (b) **Mes del presupuesto**: columna nueva al final
+de `Movimientos` (vacía = mes de la fecha), selector "Cuenta para: oct · nov" al clasificar (a la vista
+en los últimos/primeros días del mes), lo movido se ve en ambos meses; nunca automático; (c) el dueño
+cierra octubre en la app; (d) corrida del 2-nov (abajo); (e) dólares: 63 compras US$ de la tarjeta en
+octubre (60 en No Presup.), `tipoCambio = 0`: decidir conversión, revisar duplicados y sumar la deuda
+US$ al "disponible de verdad"; (f) presupuesto de noviembre + compromisos fijos → arriba de Mes:
+Tengo / Debo / Por pagar / Me queda del presupuesto / Libre de verdad.
+
 1. **Revisar la corrida automática del 2026-11-02** (detalles en `CLAUDE.local.md`): que la tarjeta
    traiga sus 4 conceptos con la etiqueta correcta y arreglar en el proceso local cómo se lee el signo
    de la cartola de octubre (hoy no cuadra y se descarta entera).
