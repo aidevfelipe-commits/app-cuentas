@@ -188,3 +188,12 @@ a { color: var(--primario); }
 .monto-cat { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .monto-cat .sub { font-weight: 400; }
 .fila-cat-pie { margin-top: -2px; }
+
+.fila-saldo { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.fila-saldo span { color: var(--suave); }
+.fila-saldo b { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.fila-saldo.deuda b { color: var(--gasto); }
+.fila-saldo.libre { border-top: 1px solid var(--linea); padding-top: 8px; margin-top: 2px; }
+.fila-saldo.libre span { color: var(--tinta); font-weight: 600; }
+.fila-saldo.libre b { font-size: 1.6rem; color: var(--abono); }
+.fila-saldo.libre.negativo b { color: var(--gasto); }

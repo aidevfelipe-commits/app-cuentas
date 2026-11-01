@@ -1,6 +1,6 @@
 // Guarda la app para abrirla sin conexión (los datos se guardan aparte, en localStorage).
 // VERSION debe ser igual a VERSION_APP en app.js: al cambiarla, los teléfonos descargan la app nueva.
-var VERSION = 'v5';
+var VERSION = 'v6';
 
 var ARCHIVOS = ['./', 'index.html', 'styles.css', 'app.js', 'config.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-180.png'];
 

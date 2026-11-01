@@ -507,13 +507,19 @@
    "cuenta": "Cuenta Corriente",
    "concepto": "Saldo en cuenta",
    "monto": 1234567,
-   "leidoEn": "2026-10-29T14:55:00.000Z"
+   "leidoEn": "2026-11-01T14:55:00.000Z"
   },
   {
-   "cuenta": "Cuenta Corriente",
-   "concepto": "Total disponible",
-   "monto": 1234567,
-   "leidoEn": "2026-10-29T14:55:00.000Z"
+   "cuenta": "Tarjeta de Crédito",
+   "concepto": "Deuda total",
+   "monto": 412000,
+   "leidoEn": "2026-11-01T14:57:00.000Z"
+  },
+  {
+   "cuenta": "Tarjeta de Crédito",
+   "concepto": "Cupo disponible",
+   "monto": 2088000,
+   "leidoEn": "2026-11-01T14:57:00.000Z"
   }
  ]
 }

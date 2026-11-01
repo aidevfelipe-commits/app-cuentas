@@ -3,7 +3,7 @@
 
   var CLAVE_SESION = 'cuentas-sesion-v1';
   var CLAVE_DATOS = 'cuentas-datos-v1';
-  var VERSION_APP = 'v5'; // igual que VERSION en sw.js (subir ambas en cada cambio)
+  var VERSION_APP = 'v6'; // igual que VERSION en sw.js (subir ambas en cada cambio)
   var NOMBRE = 'Cuentas';
   var SIN = 'Sin clasificar';
   var MAX_AUTOS = 30;
@@ -422,20 +422,37 @@
       (marca !== undefined ? '<i style="left:' + (marca * 100).toFixed(1) + '%" title="Hoy"></i>' : '') + '</div>';
   }
 
-  /** Lo que hay hoy en el banco (pestaña Saldos, la llena el scraper al entrar a BICE). */
+  /**
+   * Lo que hay hoy en el banco (pestaña Saldos, la llena el scraper al entrar a BICE): saldo de la
+   * cuenta, deuda de la tarjeta y "disponible de verdad" = saldo - deuda (se paga la tarjeta completa).
+   * Las etiquetas de la tarjeta vienen tal como las nombra BICE.
+   */
   function tarjetaSaldos() {
     var saldos = estado.datos.saldos || [];
-    var buscar = function (concepto) { return saldos.filter(function (x) { return x.concepto === concepto; })[0]; };
-    var enCuenta = buscar('Saldo en cuenta'), disponible = buscar('Total disponible');
-    if (!enCuenta && !disponible) return '';
-    var principal = enCuenta || disponible;
-    var d = new Date(principal.leidoEn), hoy = new Date();
-    var hora = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
-    var cuando = d.toDateString() === hoy.toDateString() ? 'hoy ' + hora : d.getDate() + ' ' + MESES[d.getMonth()].slice(0, 3) + ' ' + hora;
-    return '<section class="tarjeta resumen-mes saldos"><p class="sub">En la cuenta corriente</p>' +
-      '<p class="grande">' + esc(dinero(principal.monto)) + '</p>' +
-      (enCuenta && disponible && disponible.monto !== enCuenta.monto ? '<p class="sub">Total disponible ' + esc(dinero(disponible.monto)) + '</p>' : '') +
-      '<p class="sub">Leído en BICE ' + esc(cuando) + '. La deuda de la tarjeta aparecerá aquí cuando aprenda a leerla.</p></section>';
+    var deCuenta = function (concepto) { return saldos.filter(function (x) { return /corriente/i.test(x.cuenta) && x.concepto === concepto; })[0]; };
+    var tarjeta = saldos.filter(function (x) { return /tarjeta/i.test(x.cuenta); });
+    var enCuenta = deCuenta('Saldo en cuenta') || deCuenta('Total disponible');
+    var deudas = tarjeta.filter(function (x) { return /deuda|utilizad|facturad/i.test(x.concepto); });
+    var deuda = deudas.filter(function (x) { return /total/i.test(x.concepto); })[0] || deudas[0];
+    if (!enCuenta && !tarjeta.length) return '';
+    var hoy = new Date();
+    var cuando = function (iso) {
+      var d = new Date(iso), hora = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+      return d.toDateString() === hoy.toDateString() ? 'hoy ' + hora : d.getDate() + ' ' + MESES[d.getMonth()].slice(0, 3) + ' ' + hora;
+    };
+    var fila = function (texto, monto, clase) { return '<div class="fila-saldo' + (clase ? ' ' + clase : '') + '"><span>' + esc(texto) + '</span><b>' + esc(dinero(monto)) + '</b></div>'; };
+    var h = '<section class="tarjeta resumen-mes saldos"><p class="sub">Hoy en el banco</p>';
+    if (enCuenta) h += fila('En la cuenta corriente', enCuenta.monto);
+    if (deuda) h += fila('Deuda de la tarjeta', -Math.abs(deuda.monto), 'deuda');
+    if (enCuenta && deuda) {
+      var libre = enCuenta.monto - Math.abs(deuda.monto);
+      h += fila('Disponible de verdad', libre, 'libre' + (libre < 0 ? ' negativo' : ''));
+    }
+    tarjeta.filter(function (x) { return x !== deuda; }).forEach(function (x) { h += '<p class="sub">' + esc(x.concepto) + ': ' + esc(dinero(x.monto)) + '</p>'; });
+    var leido = (enCuenta || tarjeta[0]).leidoEn;
+    h += '<p class="sub">Leído en BICE ' + esc(cuando(leido)) + '.' + (enCuenta && deuda ? ' "Disponible de verdad" es lo que queda si pagas la tarjeta completa.' : '') +
+      (enCuenta && !tarjeta.length ? ' La deuda de la tarjeta aparecerá aquí después de la próxima lectura.' : '') + '</p></section>';
+    return h;
   }
 
   function vistaMes() {
