@@ -20,6 +20,7 @@ function crearHoja(nombre, filas) {
     getMaxRows: () => Math.max(1000, h.datos.length),
     insertColumnsAfter: (_, n) => { h.maxCols += n; },
     getRange: (r, c, nr = 1, nc = 1) => rango(h, r, c, nr, nc),
+    deleteRow: (r) => { h.datos.splice(r - 1, 1); },
     getDataRange: () => rango(h, 1, 1, Math.max(1, h.getLastRow()), Math.max(1, h.getLastColumn())),
     setFrozenRows() {}, setColumnWidth() {}, setTabColor() {}
   };
@@ -367,4 +368,22 @@ test('saldos: solo cuenta la última lectura de cada cuenta (un valor mal leído
   const d = post(e, { accion: 'datos', token: sesion(e) });
   const conceptos = JSON.parse(JSON.stringify(d.saldos)).map(x => x.concepto).sort();
   assert.deepEqual(conceptos, ['Cupo internacional utilizado (US$)', 'Cupo nacional utilizado', 'Saldo en cuenta']);
+});
+
+test('eliminarCopiasSigno: borra solo copias negativas con abono gemelo, respaldando antes', () => {
+  const e = conSesion();
+  const token = sesion(e);
+  const cc = (id, dias, monto) => [id, hoy(dias), 'Abono X', monto, 'CLP', 'Cuenta Corriente', 'Sin clasificar', '', 'Sin clasificar', '', ''];
+  const FechaCtx = vm.runInContext('Date', e.ctx);
+  [cc('ab_1', 3, 100000), cc('cp_1', 3, -100000), cc('ot_1', 4, -5000)].forEach(f => { f[1] = new FechaCtx(f[1].getTime()); e.hojas.Movimientos.datos.push(f); });
+  const respaldosAntes = e.copias.length;
+  assert.match(post(e, { accion: 'eliminarCopiasSigno', token, ids: ['cp_1', 'ot_1'] }).error, /no se borró nada/);
+  assert.ok(mov(e, 'cp_1'), 'si uno no calza, no se borra ninguno');
+  const d = post(e, { accion: 'eliminarCopiasSigno', token, ids: ['cp_1'] });
+  assert.equal(d.ok, true, d.error);
+  assert.equal(mov(e, 'cp_1'), undefined);
+  assert.ok(mov(e, 'ab_1') && mov(e, 'ot_1') && mov(e, 'mv_9'), 'lo demás sigue');
+  assert.equal(e.copias.length, respaldosAntes + 1);
+  const ed = conSesion('dos@example.com');
+  assert.match(post(ed, { accion: 'eliminarCopiasSigno', token: sesion(ed), ids: ['mv_1'] }).error, /Solo el administrador/);
 });

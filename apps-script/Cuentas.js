@@ -263,3 +263,27 @@ function leerSaldos_() {
     return { cuenta: u.cuenta, concepto: u.concepto, monto: u.monto, leidoEn: u.fecha.toISOString() };
   });
 }
+
+/**
+ * Borra copias de abonos que entraron con signo de cargo (cartola que no cuadraba, 2026-10-28..11-01):
+ * { ids }. Solo admin. Cada id se vuelve a verificar aquí (negativo, cuenta corriente y con un abono
+ * idéntico en positivo: misma fecha, mismo monto); si alguno no calza, no se borra nada. Respalda antes.
+ */
+function eliminarCopiasSigno_(yo, cfg, p) {
+  if (yo.rol !== 'admin') throw new Error('Solo el administrador puede borrar movimientos.');
+  var movs = leerMovimientos_();
+  var elegidos = ubicar_(movs, p.ids);
+  var positivos = {};
+  movs.forEach(function (m) { if (m.monto > 0) positivos[m.fecha + '|' + m.monto + '|' + m.cuenta] = true; });
+  elegidos.forEach(function (m) {
+    if (!(m.monto < 0 && /corriente/i.test(m.cuenta) && positivos[m.fecha + '|' + (-m.monto) + '|' + m.cuenta])) {
+      throw new Error('Un movimiento no es una copia con signo invertido; no se borró nada.');
+    }
+  });
+  respaldar_('antes de borrar ' + elegidos.length + ' copias con signo invertido');
+  var sh = hoja_('movimientos');
+  elegidos.map(function (m) { return m.fila; }).sort(function (a, b) { return b - a; })
+    .forEach(function (fila) { sh.deleteRow(fila); });
+  registrar_('Copias con signo invertido borradas', yo.nombre + ': ' + elegidos.length + ' fila(s), ' + elegidos.map(function (m) { return m.id; }).join(', '));
+  return datosUsuario_(yo, cfg, pasadaClasificador_(cfg));
+}

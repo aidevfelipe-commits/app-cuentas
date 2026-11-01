@@ -8,6 +8,7 @@
  *   { accion: 'confirmar', token, ids }                       (revisé las automáticas)
  *   { accion: 'nota', token, ids: [id], nota }
  *   { accion: 'regla', token, palabra, categoria }           (solo admin: regla fija en Reglas)
+ *   { accion: 'eliminarCopiasSigno', token, ids }            (solo admin: copias de abonos con signo de cargo)
  *   { accion: 'diagnostico', token }                          (solo admin: estructura, sin datos de movimientos)
  * Las que escriben devuelven lo mismo que 'datos', ya actualizado.
  *
@@ -50,6 +51,7 @@ function doPost(e) {
       case 'confirmar': return json_(conBloqueo_(function () { return confirmar_(yo, cfg, p); }));
       case 'nota': return json_(conBloqueo_(function () { return guardarNota_(yo, cfg, p); }));
       case 'regla': return json_(conBloqueo_(function () { return agregarRegla_(yo, cfg, p); }));
+      case 'eliminarCopiasSigno': return json_(conBloqueo_(function () { return eliminarCopiasSigno_(yo, cfg, p); }));
       case 'diagnostico': return json_(diagnostico_(yo));
       default: return json_({ ok: false, error: 'Acción desconocida' });
     }
