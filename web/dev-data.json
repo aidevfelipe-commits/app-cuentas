@@ -511,15 +511,27 @@
   },
   {
    "cuenta": "Tarjeta de Crédito",
-   "concepto": "Deuda total",
+   "concepto": "Cupo nacional utilizado",
    "monto": 412000,
-   "leidoEn": "2026-11-01T14:57:00.000Z"
+   "leidoEn": "2026-11-01T14:55:00.000Z"
   },
   {
    "cuenta": "Tarjeta de Crédito",
-   "concepto": "Cupo disponible",
+   "concepto": "Disponible nacional",
    "monto": 2088000,
-   "leidoEn": "2026-11-01T14:57:00.000Z"
+   "leidoEn": "2026-11-01T14:55:00.000Z"
+  },
+  {
+   "cuenta": "Tarjeta de Crédito",
+   "concepto": "Cupo internacional utilizado (US$)",
+   "monto": 120.5,
+   "leidoEn": "2026-11-01T14:55:00.000Z"
+  },
+  {
+   "cuenta": "Tarjeta de Crédito",
+   "concepto": "Disponible internacional (US$)",
+   "monto": 1500,
+   "leidoEn": "2026-11-01T14:55:00.000Z"
   }
  ]
 }

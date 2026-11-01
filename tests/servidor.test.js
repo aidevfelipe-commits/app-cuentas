@@ -353,3 +353,18 @@ test('datos trae el último saldo de cada concepto', () => {
   assert.equal(s[0].monto, 850000);
   assert.match(s[0].leidoEn, /^2026-11-02T/);
 });
+
+test('saldos: solo cuenta la última lectura de cada cuenta (un valor mal leído no queda pegado)', () => {
+  const base = planillaBase();
+  base.Saldos = [['Fecha', 'Cuenta', 'Concepto', 'Monto'],
+    ['2026-11-01 15:09', 'Tarjeta de Crédito', 'Cupo internacional utilizado', 412000],
+    ['2026-11-01 15:09', 'Cuenta Corriente', 'Saldo en cuenta', 900000],
+    ['2026-11-02 11:55', 'Tarjeta de Crédito', 'Cupo nacional utilizado', 412000],
+    ['2026-11-02 11:55', 'Tarjeta de Crédito', 'Cupo internacional utilizado (US$)', 120.5]];
+  const e = crearEntorno(base, { token: { aud: 'cliente-1', email: 'dueno@example.com', email_verified: 'true' } });
+  e.ctx.prepararPlanilla();
+  e.hojas.App_Ajustes.datos.find(f => f[0] === 'googleClientId')[1] = 'cliente-1';
+  const d = post(e, { accion: 'datos', token: sesion(e) });
+  const conceptos = JSON.parse(JSON.stringify(d.saldos)).map(x => x.concepto).sort();
+  assert.deepEqual(conceptos, ['Cupo internacional utilizado (US$)', 'Cupo nacional utilizado', 'Saldo en cuenta']);
+});

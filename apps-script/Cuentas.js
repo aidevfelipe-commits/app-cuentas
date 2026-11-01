@@ -240,18 +240,26 @@ function leerPendientes_() {
   return r;
 }
 
-/** Último valor de cada (Cuenta, Concepto) de la pestaña Saldos, que llena el scraper al entrar al banco. */
+/**
+ * Saldos de la última lectura de cada cuenta (pestaña Saldos, la llena el scraper al entrar al banco).
+ * Solo cuentan las filas de la lectura más reciente: si una etiqueta cambia o se leyó mal, no queda
+ * un valor viejo pegado.
+ */
 function leerSaldos_() {
-  var ultimos = {};
+  var filas = [], ultima = {};
   leerTabla_('saldos', { opcional: true }).forEach(function (f) {
     var fecha = fechaHora_(f['Fecha']), monto = numero_(f['Monto']);
     var cuenta = String(f['Cuenta'] || '').trim(), concepto = String(f['Concepto'] || '').trim();
     if (!fecha || isNaN(monto) || !concepto) return;
-    var clave = cuenta + '|' + concepto;
-    if (!ultimos[clave] || ultimos[clave].fecha < fecha) ultimos[clave] = { cuenta: cuenta, concepto: concepto, monto: monto, fecha: fecha };
+    filas.push({ cuenta: cuenta, concepto: concepto, monto: monto, fecha: fecha });
+    if (!ultima[cuenta] || ultima[cuenta] < fecha) ultima[cuenta] = fecha;
   });
-  return Object.keys(ultimos).map(function (k) {
-    var u = ultimos[k];
+  var porClave = {};
+  filas.forEach(function (x) {
+    if (x.fecha.getTime() === ultima[x.cuenta].getTime()) porClave[x.cuenta + '|' + x.concepto] = x;
+  });
+  return Object.keys(porClave).map(function (k) {
+    var u = porClave[k];
     return { cuenta: u.cuenta, concepto: u.concepto, monto: u.monto, leidoEn: u.fecha.toISOString() };
   });
 }
