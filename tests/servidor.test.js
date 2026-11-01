@@ -336,3 +336,20 @@ test('sin pestañas de presupuesto la app funciona igual', () => {
   assert.equal(d.ok, true);
   assert.deepEqual(JSON.parse(JSON.stringify(d.presupuesto)), { porDefecto: {}, meses: {} });
 });
+
+test('datos trae el último saldo de cada concepto', () => {
+  const base = planillaBase();
+  base.Saldos = [['Fecha', 'Cuenta', 'Concepto', 'Monto'],
+    ['2026-10-31 11:55', 'Cuenta Corriente', 'Saldo en cuenta', 900000],
+    ['2026-11-02 11:50', 'Cuenta Corriente', 'Saldo en cuenta', 850000],
+    ['2026-11-02 11:50', 'Cuenta Corriente', 'Total disponible', 850000]];
+  const e = crearEntorno(base, { token: { aud: 'cliente-1', email: 'dueno@example.com', email_verified: 'true' } });
+  e.ctx.prepararPlanilla();
+  e.hojas.App_Ajustes.datos.find(f => f[0] === 'googleClientId')[1] = 'cliente-1';
+  const d = post(e, { accion: 'datos', token: sesion(e) });
+  const s = JSON.parse(JSON.stringify(d.saldos)).sort((a, b) => a.concepto.localeCompare(b.concepto));
+  assert.equal(s.length, 2);
+  assert.equal(s[0].concepto, 'Saldo en cuenta');
+  assert.equal(s[0].monto, 850000);
+  assert.match(s[0].leidoEn, /^2026-11-02T/);
+});

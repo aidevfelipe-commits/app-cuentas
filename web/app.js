@@ -3,7 +3,7 @@
 
   var CLAVE_SESION = 'cuentas-sesion-v1';
   var CLAVE_DATOS = 'cuentas-datos-v1';
-  var VERSION_APP = 'v4'; // igual que VERSION en sw.js (subir ambas en cada cambio)
+  var VERSION_APP = 'v5'; // igual que VERSION en sw.js (subir ambas en cada cambio)
   var NOMBRE = 'Cuentas';
   var SIN = 'Sin clasificar';
   var MAX_AUTOS = 30;
@@ -422,6 +422,22 @@
       (marca !== undefined ? '<i style="left:' + (marca * 100).toFixed(1) + '%" title="Hoy"></i>' : '') + '</div>';
   }
 
+  /** Lo que hay hoy en el banco (pestaña Saldos, la llena el scraper al entrar a BICE). */
+  function tarjetaSaldos() {
+    var saldos = estado.datos.saldos || [];
+    var buscar = function (concepto) { return saldos.filter(function (x) { return x.concepto === concepto; })[0]; };
+    var enCuenta = buscar('Saldo en cuenta'), disponible = buscar('Total disponible');
+    if (!enCuenta && !disponible) return '';
+    var principal = enCuenta || disponible;
+    var d = new Date(principal.leidoEn), hoy = new Date();
+    var hora = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    var cuando = d.toDateString() === hoy.toDateString() ? 'hoy ' + hora : d.getDate() + ' ' + MESES[d.getMonth()].slice(0, 3) + ' ' + hora;
+    return '<section class="tarjeta resumen-mes saldos"><p class="sub">En la cuenta corriente</p>' +
+      '<p class="grande">' + esc(dinero(principal.monto)) + '</p>' +
+      (enCuenta && disponible && disponible.monto !== enCuenta.monto ? '<p class="sub">Total disponible ' + esc(dinero(disponible.monto)) + '</p>' : '') +
+      '<p class="sub">Leído en BICE ' + esc(cuando) + '. La deuda de la tarjeta aparecerá aquí cuando aprenda a leerla.</p></section>';
+  }
+
   function vistaMes() {
     document.title = 'Mes · ' + NOMBRE;
     var ym = estado.mes, r = resumenMes(ym);
@@ -429,6 +445,7 @@
     var diasMes = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate();
     var avance = esActual ? hoy.getDate() / diasMes : undefined;
     var h = cabecera('Mes') + '<main>' + selectorMes();
+    if (esActual) h += tarjetaSaldos();
 
     var usadoPct = r.presupuesto ? Math.round(r.gastado / r.presupuesto * 100) : 0;
     h += '<section class="tarjeta resumen-mes"><p class="sub">Gastado de verdad</p>' +

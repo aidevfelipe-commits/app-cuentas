@@ -107,6 +107,7 @@ function datosUsuario_(yo, cfg, pasada) {
     desde: desde,
     presupuesto: leerPresupuesto_(),
     pendientes: leerPendientes_(),
+    saldos: leerSaldos_(),
     tipoCambio: numero_(cfg.tipoCambio) || 0,
     modelo: pasada.plan.evaluacion,
     planilla: yo.rol === 'admin' ? planilla_().getUrl() : ''
@@ -237,4 +238,20 @@ function leerPendientes_() {
     r[ym][cat] = (r[ym][cat] || 0) + monto;
   });
   return r;
+}
+
+/** Último valor de cada (Cuenta, Concepto) de la pestaña Saldos, que llena el scraper al entrar al banco. */
+function leerSaldos_() {
+  var ultimos = {};
+  leerTabla_('saldos', { opcional: true }).forEach(function (f) {
+    var fecha = fechaHora_(f['Fecha']), monto = numero_(f['Monto']);
+    var cuenta = String(f['Cuenta'] || '').trim(), concepto = String(f['Concepto'] || '').trim();
+    if (!fecha || isNaN(monto) || !concepto) return;
+    var clave = cuenta + '|' + concepto;
+    if (!ultimos[clave] || ultimos[clave].fecha < fecha) ultimos[clave] = { cuenta: cuenta, concepto: concepto, monto: monto, fecha: fecha };
+  });
+  return Object.keys(ultimos).map(function (k) {
+    var u = ultimos[k];
+    return { cuenta: u.cuenta, concepto: u.concepto, monto: u.monto, leidoEn: u.fecha.toISOString() };
+  });
 }

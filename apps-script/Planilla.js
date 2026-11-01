@@ -45,6 +45,13 @@ var HOJAS = {
     obligatorios: ['Categoria', 'Mes', 'Monto_Presupuestado'],
     titulos: []
   },
+  saldos: {
+    nombre: 'Saldos',
+    existente: true,
+    opcional: true,
+    obligatorios: ['Fecha', 'Cuenta', 'Concepto', 'Monto'],
+    titulos: []
+  },
   pendientes: {
     nombre: 'Pendientes',
     existente: true,

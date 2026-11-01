@@ -501,5 +501,19 @@
    "Casa(G.E.T.A)": 45000
   }
  },
- "tipoCambio": 0
+ "tipoCambio": 0,
+ "saldos": [
+  {
+   "cuenta": "Cuenta Corriente",
+   "concepto": "Saldo en cuenta",
+   "monto": 1234567,
+   "leidoEn": "2026-10-29T14:55:00.000Z"
+  },
+  {
+   "cuenta": "Cuenta Corriente",
+   "concepto": "Total disponible",
+   "monto": 1234567,
+   "leidoEn": "2026-10-29T14:55:00.000Z"
+  }
+ ]
 }
